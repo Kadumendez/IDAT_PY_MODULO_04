@@ -30,13 +30,27 @@ El sistema permite gestionar **usuarios, roles y planos** mediante una **API RES
    ```
 
 2. **Crea y activa un entorno virtual.**
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate
+   ```
 
 3. **Instala las dependencias:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Ejecuta el servidor de desarrollo:**
+4. **Aplicar migraciones de Django (tablas):**
+   ```bash
+   python manage.py migrate
+   ```
+   
+5. **Crear el superusuario automáticamente:**
+   ```bash
+   python manage.py seed_admin
+   ```
+
+6. **Ejecuta el servidor de desarrollo:**
    ```bash
    python manage.py runserver
    ```
