@@ -19,3 +19,20 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING(
                 f"⚠️ El superusuario '{username}' ya existe."))
+
+        # 👷 Usuario normal (no superuser)
+        normal_username = "usuario1"
+        normal_password = "usuario123"
+        normal_email = "usuario1@example.com"
+
+        if not User.objects.filter(username=normal_username).exists():
+            User.objects.create_user(
+                username=normal_username,
+                email=normal_email,
+                password=normal_password
+            )
+            self.stdout.write(self.style.SUCCESS(
+                f"✅ Usuario normal '{normal_username}' creado."))
+        else:
+            self.stdout.write(self.style.WARNING(
+                f"⚠️ El usuario normal '{normal_username}' ya existe."))

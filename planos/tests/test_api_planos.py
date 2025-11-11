@@ -4,12 +4,10 @@ from rest_framework.test import APIClient
 from rest_framework.reverse import reverse
 
 # ============================================================
-# 💡 Tests de API para Planos (DRF ModelViewSet)
-# Basados en tus archivos:
-# - models.Plano (FK subido_por -> User)
-# - serializers.PlanoSerializer (fields="__all__")
-# - views.PlanoViewSet con acción eliminar_todo (detail=False)
-# - urls con router basename="plano"
+# Tests de API para Planos (DRF ModelViewSet)
+# Ajustado a views.PlanoViewSet con acciones:
+#   - eliminar_todos  -> nombre: "plano-eliminar-todos"
+#   - limpiar-pruebas -> nombre: "plano-limpiar-pruebas"
 # ============================================================
 
 
@@ -29,8 +27,7 @@ def payload_ok(user):
     return {
         "titulo": "Plano Eléctrico – Tablero A",
         "descripcion": "Diseño correcto del tablero general con derivaciones",
-        # FK escribible (tu serializer expone todos los campos)
-        "subido_por": user.id,
+        "subido_por": user.id,    # FK escribible
         "area": "Producción",
         "subarea": "Laminado",
     }
@@ -38,28 +35,34 @@ def payload_ok(user):
 
 @pytest.fixture()
 def url_list():
-    # Nombre: <basename>-list => "plano-list"
+    # router.register('planos', PlanoViewSet, basename='plano')
     return reverse("plano-list")
 
 
 @pytest.fixture()
-def url_eliminar_todo():
-    # Nombre: <basename>-<url_path> => "plano-eliminar-todo"
-    return reverse("plano-eliminar-todo")
+def url_eliminar_todos():
+    # @action(url_path='eliminar_todos') -> "plano-eliminar-todos"
+    return reverse("plano-eliminar-todos")
+
+
+@pytest.fixture()
+def url_limpiar_pruebas():
+    # @action(url_path='limpiar-pruebas') -> "plano-limpiar-pruebas"
+    return reverse("plano-limpiar-pruebas")
 
 
 def url_detail(pk: int):
-    # Nombre: <basename>-detail => "plano-detail"
     return reverse("plano-detail", args=[pk])
-
 
 # ------------------------------------------------------------
 # 1) Crear
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
 def test_1_crear_plano_201(client, url_list, payload_ok):
     r = client.post(url_list, payload_ok, format="json")
-    assert r.status_code == 201, f"Esperado 201, obtuve {r.status_code} con body: {getattr(r, 'data', r.content)}"
+    assert r.status_code == 201, f"Esperado 201, obtuve {r.status_code} con {getattr(r, 'data', r.content)}"
     data = r.json()
     for k in ("id", "titulo", "area", "subarea", "subido_por"):
         assert k in data
@@ -71,10 +74,11 @@ def test_1b_crear_plano_400_faltan_campos(client, url_list, payload_ok):
     r = client.post(url_list, bad, format="json")
     assert r.status_code == 400
 
-
 # ------------------------------------------------------------
 # 2) Listar
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
 def test_2_listar_planos_200(client, url_list, payload_ok):
     client.post(url_list, payload_ok, format="json")
@@ -83,14 +87,14 @@ def test_2_listar_planos_200(client, url_list, payload_ok):
     assert isinstance(r.json(), list)
     assert len(r.json()) >= 1
 
-
 # ------------------------------------------------------------
 # 3) Obtener por id
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
 def test_3_obtener_por_id_200(client, url_list, payload_ok):
-    created = client.post(url_list, payload_ok, format="json").json()
-    rid = created["id"]
+    rid = client.post(url_list, payload_ok, format="json").json()["id"]
     r = client.get(url_detail(rid))
     assert r.status_code == 200
     assert r.json()["id"] == rid
@@ -101,14 +105,14 @@ def test_3b_obtener_por_id_404(client):
     r = client.get(url_detail(999999))
     assert r.status_code == 404
 
-
 # ------------------------------------------------------------
 # 4) Actualizar (PUT/PATCH)
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
 def test_4_put_actualizar_200(client, url_list, payload_ok):
-    created = client.post(url_list, payload_ok, format="json").json()
-    rid = created["id"]
+    rid = client.post(url_list, payload_ok, format="json").json()["id"]
     updated = payload_ok | {
         "titulo": "Plano Arquitectónico – Oficina 2", "area": "Arquitectura"}
     r = client.put(url_detail(rid), updated, format="json")
@@ -120,45 +124,51 @@ def test_4_put_actualizar_200(client, url_list, payload_ok):
 
 @pytest.mark.django_db
 def test_4b_patch_actualizar_parcial_200(client, url_list, payload_ok):
-    created = client.post(url_list, payload_ok, format="json").json()
-    rid = created["id"]
+    rid = client.post(url_list, payload_ok, format="json").json()["id"]
     r = client.patch(url_detail(rid), {"subarea": "Corte"}, format="json")
     assert r.status_code == 200
     assert r.json()["subarea"] == "Corte"
 
-
 # ------------------------------------------------------------
 # 5) Eliminar (DELETE)
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
 def test_5_delete_204(client, url_list, payload_ok):
-    created = client.post(url_list, payload_ok, format="json").json()
-    rid = created["id"]
+    rid = client.post(url_list, payload_ok, format="json").json()["id"]
     r = client.delete(url_detail(rid))
+    # tu destroy devuelve 204 en éxito
     assert r.status_code in (200, 204)
-    r2 = client.get(url_detail(rid))
-    assert r2.status_code == 404
+    assert client.get(url_detail(rid)).status_code == 404
 
 
 @pytest.mark.django_db
 def test_5b_delete_404(client):
-    r = client.delete(url_detail(999999))
-    assert r.status_code == 404
-
+    assert client.delete(url_detail(999999)).status_code == 404
 
 # ------------------------------------------------------------
-# 6) Acción personalizada: eliminar_todo
+# 6) Acciones personalizadas: eliminar_todos / limpiar-pruebas
 # ------------------------------------------------------------
+
+
 @pytest.mark.django_db
-def test_6_eliminar_todo(client, url_list, url_eliminar_todo, payload_ok):
-    # crea dos
+def test_6_eliminar_todos(client, url_list, url_eliminar_todos, payload_ok):
     client.post(url_list, payload_ok, format="json")
     client.post(url_list, payload_ok | {"titulo": "Plano B"}, format="json")
-
-    r = client.delete(url_eliminar_todo)
+    r = client.delete(url_eliminar_todos)
     assert r.status_code in (200, 204)
+    r2 = client.get(url_list)
+    assert r2.status_code == 200
+    assert r2.json() == []
 
-    # verifica que quedó vacío
+
+@pytest.mark.django_db
+def test_6b_limpiar_pruebas(client, url_list, url_limpiar_pruebas, payload_ok):
+    client.post(url_list, payload_ok, format="json")
+    client.post(url_list, payload_ok | {"titulo": "Plano C"}, format="json")
+    r = client.delete(url_limpiar_pruebas)
+    assert r.status_code in (200, 204)
     r2 = client.get(url_list)
     assert r2.status_code == 200
     assert r2.json() == []
