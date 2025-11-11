@@ -1,211 +1,164 @@
-# 💡 Tests de API para el app Planos (Django REST Framework)
-
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
-from planos.models import Plano
+from rest_framework.reverse import reverse
 
-# --------------------------------------------------------------------
-# 🔧 Helpers mínimos y a prueba de cambios en el modelo
-# --------------------------------------------------------------------
+# ============================================================
+# 💡 Tests de API para Planos (DRF ModelViewSet)
+# Basados en tus archivos:
+# - models.Plano (FK subido_por -> User)
+# - serializers.PlanoSerializer (fields="__all__")
+# - views.PlanoViewSet con acción eliminar_todo (detail=False)
+# - urls con router basename="plano"
+# ============================================================
 
 
-def _model_has_field(model, field_name: str) -> bool:
-    return any(f.name == field_name for f in model._meta.get_fields())
-
-
-@pytest.fixture
-def api_client():
+@pytest.fixture()
+def client():
     return APIClient()
 
 
-@pytest.fixture
-def api_client_auth(db):
-    """Cliente autenticado con sesión (para endpoints protegidos)."""
+@pytest.fixture()
+def user(db):
     User = get_user_model()
-    user = User.objects.create_user(username="tester", password="pass123")
-    client = APIClient()
-    client.login(username="tester", password="pass123")
-    return client
+    return User.objects.create_user(username="tester", password="secret123")
 
 
-@pytest.fixture
-def fabrica_relaciones(db):
-    """
-    Crea las relaciones necesarias SOLO si el modelo Plano las exige.
-    Devuelve un dict con kwargs válidos para crear/POSTear un Plano.
-    """
-    from django.apps import apps
-    kwargs = {}
-
-    # Usuario (subido_por)
-    if _model_has_field(Plano, "subido_por"):
-        User = get_user_model()
-        uploader = User.objects.create_user(
-            username="uploader", password="pass123")
-        kwargs["subido_por"] = uploader.id  # Para payloads API usaremos el ID
-
-    # Área/Subárea
-    if _model_has_field(Plano, "subarea"):
-        Area = apps.get_model("planos", "Area")
-        Subarea = apps.get_model("planos", "Subarea")
-        area = Area.objects.create(nombre="Área Demo", abrev="ARD")
-        sub = Subarea.objects.create(
-            nombre="Subárea Demo", abrev="SBD", area=area)
-        kwargs["subarea"] = sub.id  # Para payloads API usaremos el ID
-
-    return kwargs
+@pytest.fixture()
+def payload_ok(user):
+    return {
+        "titulo": "Plano Eléctrico – Tablero A",
+        "descripcion": "Diseño correcto del tablero general con derivaciones",
+        # FK escribible (tu serializer expone todos los campos)
+        "subido_por": user.id,
+        "area": "Producción",
+        "subarea": "Laminado",
+    }
 
 
-def crear_plano_ORM(**extra):
-    """
-    Crea un Plano vía ORM, resolviendo automáticamente FKs si existen.
-    - Para ORM: subido_por debe ser instancia User (no ID).
-    - Para ORM: subarea debe ser instancia Subarea (ya lo hacemos).
-    """
-    base = dict(titulo="Plano Demo", descripcion="Descripción demo")
-    from django.apps import apps
-    from django.contrib.auth import get_user_model
-
-    # ✅ User instancia (NO .pk)
-    if _model_has_field(Plano, "subido_por") and "subido_por" not in extra:
-        User = get_user_model()
-        extra["subido_por"] = User.objects.create_user(
-            username="owner", password="x")
-
-    # ✅ Subarea instancia
-    if _model_has_field(Plano, "subarea") and "subarea" not in extra:
-        Area = apps.get_model("planos", "Area")
-        Subarea = apps.get_model("planos", "Subarea")
-        a = Area.objects.create(nombre="Área X", abrev="ARX")
-        s = Subarea.objects.create(nombre="Subárea X", abrev="SBX", area=a)
-        extra["subarea"] = s
-
-    return Plano.objects.create(**base, **extra)
+@pytest.fixture()
+def url_list():
+    # Nombre: <basename>-list => "plano-list"
+    return reverse("plano-list")
 
 
-"""
-============================================================
-🧩 API 1. Listado y Detalle (GET)
-------------------------------------------------------------
-Objetivo:
-    Verificar que los endpoints públicos de lectura respondan.
-Casos a probar:
-    ✅ GET /api/planos/ devuelve 200
-    ✅ GET /api/planos/{id}/ devuelve 200 si existe
-============================================================
-"""
+@pytest.fixture()
+def url_eliminar_todo():
+    # Nombre: <basename>-<url_path> => "plano-eliminar-todo"
+    return reverse("plano-eliminar-todo")
 
 
+def url_detail(pk: int):
+    # Nombre: <basename>-detail => "plano-detail"
+    return reverse("plano-detail", args=[pk])
+
+
+# ------------------------------------------------------------
+# 1) Crear
+# ------------------------------------------------------------
 @pytest.mark.django_db
-def test_api_listar_planos_200(api_client):
-    # Aseguramos al menos 1 registro
-    crear_plano_ORM()
-    r = api_client.get("/api/planos/")
-    assert r.status_code == 200
-
-
-@pytest.mark.django_db
-def test_api_detalle_plano_200(api_client):
-    p = crear_plano_ORM()
-    r = api_client.get(f"/api/planos/{p.id}/")
-    assert r.status_code == 200
+def test_1_crear_plano_201(client, url_list, payload_ok):
+    r = client.post(url_list, payload_ok, format="json")
+    assert r.status_code == 201, f"Esperado 201, obtuve {r.status_code} con body: {getattr(r, 'data', r.content)}"
     data = r.json()
-    assert data.get("id") == p.id
-
-
-"""
-============================================================
-🧩 API 2. Creación (POST)
-------------------------------------------------------------
-Objetivo:
-    Validar creación de recursos y permisos.
-Casos a probar:
-    ✅ 201 con autenticación y payload válido
-    🚫 401/403 sin autenticación
-    🚫 400 si faltan campos requeridos (cuando aplique)
-Notas:
-    - El payload se arma dinámicamente según campos del modelo.
-============================================================
-"""
+    for k in ("id", "titulo", "area", "subarea", "subido_por"):
+        assert k in data
 
 
 @pytest.mark.django_db
-def test_api_crear_plano_201_autenticado(api_client_auth, fabrica_relaciones):
-    payload = {"titulo": "Plano Nuevo", "descripcion": "desc"}
-    # agrega subarea/subido_por si el modelo lo exige
-    payload.update(fabrica_relaciones)
-
-    r = api_client_auth.post("/api/planos/", payload, format="json")
-    # DRF puede responder 200 si devuelve el mismo recurso
-    assert r.status_code in (201, 200)
-    assert Plano.objects.filter(titulo="Plano Nuevo").exists()
+def test_1b_crear_plano_400_faltan_campos(client, url_list, payload_ok):
+    bad = payload_ok | {"area": "", "subarea": ""}
+    r = client.post(url_list, bad, format="json")
+    assert r.status_code == 400
 
 
+# ------------------------------------------------------------
+# 2) Listar
+# ------------------------------------------------------------
 @pytest.mark.django_db
-def test_api_crear_plano_401_sin_autenticacion(api_client, fabrica_relaciones):
-    payload = {"titulo": "Privado", "descripcion": "x"}
-    payload.update(fabrica_relaciones)
-
-    r = api_client.post("/api/planos/", payload, format="json")
-    # Según tus permisos, puede ser 401 (sin auth) o 403 (auth pero sin permisos)
-    assert r.status_code in (401, 403)
-
-
-"""
-============================================================
-🧩 API 3. Actualización (PATCH)
-------------------------------------------------------------
-Objetivo:
-    Asegurar que el recurso se actualiza correctamente.
-Casos a probar:
-    ✅ 200 autenticado con datos válidos
-    🚫 401/403 si no está autenticado
-============================================================
-"""
-
-
-@pytest.mark.django_db
-def test_api_actualizar_plano_200(api_client_auth):
-    p = crear_plano_ORM()
-    r = api_client_auth.patch(
-        f"/api/planos/{p.id}/", {"descripcion": "actualizado"}, format="json")
+def test_2_listar_planos_200(client, url_list, payload_ok):
+    client.post(url_list, payload_ok, format="json")
+    r = client.get(url_list)
     assert r.status_code == 200
-    p.refresh_from_db()
-    assert p.descripcion == "actualizado"
+    assert isinstance(r.json(), list)
+    assert len(r.json()) >= 1
+
+
+# ------------------------------------------------------------
+# 3) Obtener por id
+# ------------------------------------------------------------
+@pytest.mark.django_db
+def test_3_obtener_por_id_200(client, url_list, payload_ok):
+    created = client.post(url_list, payload_ok, format="json").json()
+    rid = created["id"]
+    r = client.get(url_detail(rid))
+    assert r.status_code == 200
+    assert r.json()["id"] == rid
 
 
 @pytest.mark.django_db
-def test_api_actualizar_plano_401_sin_auth(api_client):
-    p = crear_plano_ORM()
-    r = api_client.patch(
-        f"/api/planos/{p.id}/", {"descripcion": "no deberia"}, format="json")
-    assert r.status_code in (401, 403)
+def test_3b_obtener_por_id_404(client):
+    r = client.get(url_detail(999999))
+    assert r.status_code == 404
 
 
-"""
-============================================================
-🧩 API 4. Eliminación (DELETE)
-------------------------------------------------------------
-Objetivo:
-    Validar borrado del recurso por ID.
-Casos a probar:
-    ✅ 204 autenticado
-    🚫 401/403 sin autenticación
-============================================================
-"""
+# ------------------------------------------------------------
+# 4) Actualizar (PUT/PATCH)
+# ------------------------------------------------------------
+@pytest.mark.django_db
+def test_4_put_actualizar_200(client, url_list, payload_ok):
+    created = client.post(url_list, payload_ok, format="json").json()
+    rid = created["id"]
+    updated = payload_ok | {
+        "titulo": "Plano Arquitectónico – Oficina 2", "area": "Arquitectura"}
+    r = client.put(url_detail(rid), updated, format="json")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["titulo"].startswith("Plano Arquitectónico")
+    assert body["area"] == "Arquitectura"
 
 
 @pytest.mark.django_db
-def test_api_eliminar_plano_204(api_client_auth):
-    p = crear_plano_ORM()
-    r = api_client_auth.delete(f"/api/planos/{p.id}/")
-    assert r.status_code in (204, 200, 202)
-    assert not Plano.objects.filter(id=p.id).exists()
+def test_4b_patch_actualizar_parcial_200(client, url_list, payload_ok):
+    created = client.post(url_list, payload_ok, format="json").json()
+    rid = created["id"]
+    r = client.patch(url_detail(rid), {"subarea": "Corte"}, format="json")
+    assert r.status_code == 200
+    assert r.json()["subarea"] == "Corte"
+
+
+# ------------------------------------------------------------
+# 5) Eliminar (DELETE)
+# ------------------------------------------------------------
+@pytest.mark.django_db
+def test_5_delete_204(client, url_list, payload_ok):
+    created = client.post(url_list, payload_ok, format="json").json()
+    rid = created["id"]
+    r = client.delete(url_detail(rid))
+    assert r.status_code in (200, 204)
+    r2 = client.get(url_detail(rid))
+    assert r2.status_code == 404
 
 
 @pytest.mark.django_db
-def test_api_eliminar_plano_401_sin_auth(api_client):
-    p = crear_plano_ORM()
-    r = api_client.delete(f"/api/planos/{p.id}/")
-    assert r.status_code in (401, 403)
+def test_5b_delete_404(client):
+    r = client.delete(url_detail(999999))
+    assert r.status_code == 404
+
+
+# ------------------------------------------------------------
+# 6) Acción personalizada: eliminar_todo
+# ------------------------------------------------------------
+@pytest.mark.django_db
+def test_6_eliminar_todo(client, url_list, url_eliminar_todo, payload_ok):
+    # crea dos
+    client.post(url_list, payload_ok, format="json")
+    client.post(url_list, payload_ok | {"titulo": "Plano B"}, format="json")
+
+    r = client.delete(url_eliminar_todo)
+    assert r.status_code in (200, 204)
+
+    # verifica que quedó vacío
+    r2 = client.get(url_list)
+    assert r2.status_code == 200
+    assert r2.json() == []

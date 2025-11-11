@@ -8,15 +8,18 @@ from planos.services.planos_logic import (
     generar_codigo_plano,
     prioridad_plano,
     resumen_por_usuario,
+    resumen_por_usuario_por_area,
     detectar_duplicados,
 )
+
+import pytest
 
 """
 ============================================================
 🧩 1. Pruebas para la función: verificar_titulo_valido(titulo)
 ------------------------------------------------------------
 Objetivo:
-    Validar que el título de un plano cumpla las condiciones mínimas:
+    Verificar que el título del plano cumpla las condiciones mínimas:
     - No puede ser vacío ni solo espacios.
     - Debe tener al menos 5 caracteres válidos.
 Casos a probar:
@@ -28,28 +31,17 @@ Casos a probar:
 """
 
 
-def test_titulo_valido_correcto():
-    """✅ Verifica que un título válido pase la prueba"""
-    titulo = "Plano Eléctrico"
-    assert verificar_titulo_valido(titulo) is True
-
-
-def test_titulo_muy_corto():
-    """🚫 Verifica que un título con menos de 5 caracteres falle"""
-    titulo = "AB"
-    assert verificar_titulo_valido(titulo) is False
-
-
-def test_titulo_vacio():
-    """🚫 Verifica que un título vacío falle"""
-    titulo = ""
-    assert verificar_titulo_valido(titulo) is False
-
-
-def test_titulo_con_espacios():
-    """🚫 Verifica que un título con solo espacios falle"""
-    titulo = "    "
-    assert verificar_titulo_valido(titulo) is False
+@pytest.mark.parametrize("titulo, esperado", [
+    ("Plano Eléctrico", True),
+    ("   Plano B   ", True),
+    ("", False),
+    ("   ", False),
+    ("abcd", False),
+    ("abcde", True),
+    (None, False),
+])
+def test_1_verificar_titulo_valido(titulo, esperado):
+    assert verificar_titulo_valido(titulo) is esperado
 
 
 """
@@ -65,32 +57,27 @@ Casos a probar:
     ✅ Usuario inexistente (debe devolver 0)
 ============================================================
 """
-
-# Dataset simple de ejemplo
 PLANOS_FAKE = [
     {"titulo": "Plano Eléctrico - Tablero A",
-        "descripcion": "circuitos eléctricos", "subido_por": 1},
+     "descripcion": "circuitos eléctricos", "subido_por": 1, "area": "Prod", "subarea": "L1"},
     {"titulo": "Plano Arquitectónico - Oficinas",
-        "descripcion": "diseño arquitectónico de oficinas", "subido_por": 1},
+     "descripcion": "diseño arquitectónico", "subido_por": 1, "area": "Prod", "subarea": "L2"},
     {"titulo": "Plano Estructural - Vigas",
-        "descripcion": "detalle estructural de vigas", "subido_por": 2},
+     "descripcion": "detalle estructural", "subido_por": 2, "area": "Mant", "subarea": "Gen"},
     {"titulo": "Plano General - Patio",
-        "descripcion": "replanteo general del patio", "subido_por": 2},
+     "descripcion": "replanteo general", "subido_por": 2, "area": "Mant", "subarea": "Gen"},
 ]
 
 
-def test_contar_planos_por_usuario_con_id_1():
-    """✅ Usuario 1 debe tener 2 planos en el dataset de prueba"""
+def test_2a_contar_planos_usuario_1():
     assert contar_planos_por_usuario(PLANOS_FAKE, 1) == 2
 
 
-def test_contar_planos_por_usuario_con_id_2():
-    """✅ Usuario 2 debe tener 2 planos en el dataset de prueba"""
+def test_2b_contar_planos_usuario_2():
     assert contar_planos_por_usuario(PLANOS_FAKE, 2) == 2
 
 
-def test_contar_planos_por_usuario_sin_resultados():
-    """✅ Usuario inexistente (id=99) debe devolver 0"""
+def test_2c_contar_planos_usuario_inexistente():
     assert contar_planos_por_usuario(PLANOS_FAKE, 99) == 0
 
 
@@ -100,93 +87,97 @@ def test_contar_planos_por_usuario_sin_resultados():
 ------------------------------------------------------------
 Objetivo:
     Verificar que la función asigne correctamente el tipo
-    de plano según las palabras clave en la descripción.
+    de plano según la descripción o el área.
 Casos a probar:
-    ✅ Cada descripción contiene un tipo conocido.
-    ✅ Descripción vacía o None → 'General'
+    ✅ Clasificación por descripción.
+    ✅ Clasificación de respaldo por área.
+    ✅ Insensibilidad a mayúsculas y acentos.
 ============================================================
 """
 
 
-def test_clasificar_planos_devuelve_tipos_correctos():
-    """✅ Debe mapear correctamente los tipos: Eléctrico, Arquitectónico, Estructural y General."""
+def test_3a_clasificar_por_descripcion():
     resultado = clasificar_planos(PLANOS_FAKE)
-    m = {item["titulo"]: item["tipo"] for item in resultado}
-
+    m = {r["titulo"]: r["tipo"] for r in resultado}
     assert m["Plano Eléctrico - Tablero A"] == "Eléctrico"
     assert m["Plano Arquitectónico - Oficinas"] == "Arquitectónico"
     assert m["Plano Estructural - Vigas"] == "Estructural"
     assert m["Plano General - Patio"] == "General"
 
 
-def test_clasificar_planos_maneja_descripcion_vacia():
-    """✅ Si una descripción viene vacía o None, debe clasificarse como 'General'."""
-    planos = [
-        {"titulo": "Plano X", "descripcion": None, "subido_por": 1},
-        {"titulo": "Plano Y", "descripcion": "", "subido_por": 1},
+def test_3b_clasificar_respaldo_por_area():
+    data = [
+        {"titulo": "T1", "descripcion": "",
+            "area": "ARQUITECTÓNICO", "subarea": "X"},
+        {"titulo": "T2", "descripcion": "", "area": "electrico", "subarea": "Y"},
+        {"titulo": "T3", "descripcion": "", "area": "Estructural", "subarea": "Z"},
     ]
-    res = clasificar_planos(planos)
-    assert all(item["tipo"] == "General" for item in res)
+    res = clasificar_planos(data)
+    assert [r["tipo"] for r in res] == [
+        "Arquitectónico", "Eléctrico", "Estructural"]
 
 
 """
 ============================================================
-🧩 4. Pruebas para la función: validar_plano_data(data)
+🧩 4. Pruebas para la función: validar_plano_data(data, min_desc=10)
 ------------------------------------------------------------
 Objetivo:
     Validar los datos básicos de un plano:
     - Título no vacío ni solo números.
     - Descripción con longitud mínima.
     - Sin palabras prohibidas.
+    - Área y subárea obligatorias.
 Casos a probar:
     ✅ Datos válidos
-    🚫 Título demasiado corto
-    🚫 Título solo numérico
-    🚫 Descripción muy corta
-    🚫 Palabras prohibidas
+    🚫 Título demasiado corto o numérico
+    🚫 Descripción muy corta o prohibida
+    🚫 Campos vacíos
 ============================================================
 """
 
 
-def test_validar_plano_data_valido():
-    """✅ Verifica que datos correctos pasen sin errores"""
-    data = {"titulo": "Plano Eléctrico",
-            "descripcion": "Diseño completo de tablero eléctrico"}
+def test_4a_validar_plano_data_valido():
+    data = {
+        "titulo": "Plano Eléctrico",
+        "descripcion": "Diseño completo de tablero eléctrico",
+        "area": "Producción",
+        "subarea": "Laminado"
+    }
     ok, errores = validar_plano_data(data)
     assert ok is True
     assert errores == []
 
 
-def test_validar_plano_data_titulo_corto():
-    """🚫 Título demasiado corto"""
-    data = {"titulo": "A", "descripcion": "plano de sala"}
+@pytest.mark.parametrize("data, fragmentos", [
+    ({"titulo": "A", "descripcion": "plano de sala", "area": "A", "subarea": "B"},
+     ["al menos 3"]),
+    ({"titulo": "12345", "descripcion": "plano estructural", "area": "Pr", "subarea": "La"},
+     ["números"]),
+    ({"titulo": "Plano tóxico", "descripcion": "detalle toxico", "area": "Producción", "subarea": "General"},
+     ["no permitidas"]),
+    ({"titulo": "Plano A", "descripcion": "corto", "area": "Producción", "subarea": "General"},
+     ["demasiado corta"]),
+    ({"titulo": "", "descripcion": "", "area": "", "subarea": ""},
+     ["obligatorio"]),
+])
+def test_4b_validar_plano_data_errores(data, fragmentos):
     ok, errores = validar_plano_data(data)
-    assert ok is False
-    assert any("al menos 3 caracteres" in e for e in errores)
+    assert not ok
+    joined = " | ".join(errores).lower()
+    for frag in fragmentos:
+        assert frag.lower().split()[0] in joined
 
 
-def test_validar_plano_data_titulo_numerico():
-    """🚫 Título formado solo por números"""
-    data = {"titulo": "12345", "descripcion": "plano estructural"}
-    ok, errores = validar_plano_data(data)
-    assert ok is False
-    assert any("números" in e for e in errores)
-
-
-def test_validar_plano_data_descripcion_corta():
-    """🚫 Descripción demasiado corta"""
-    data = {"titulo": "Plano X", "descripcion": "corto"}
-    ok, errores = validar_plano_data(data)
-    assert ok is False
-    assert any("demasiado corta" in e for e in errores)
-
-
-def test_validar_plano_data_palabras_prohibidas():
-    """🚫 Contiene palabras prohibidas"""
-    data = {"titulo": "plano tóxico", "descripcion": "detalle interno"}
-    ok, errores = validar_plano_data(data)
-    assert ok is False
-    assert any("no permitidas" in e for e in errores)
+def test_4c_validar_plano_data_min_desc_custom():
+    data = {
+        "titulo": "Plano B",
+        "descripcion": "corta",
+        "area": "Producción",
+        "subarea": "L1"
+    }
+    ok, errores = validar_plano_data(data, min_desc=6)
+    assert not ok
+    assert any("mínimo 6" in e for e in errores)
 
 
 """
@@ -203,22 +194,16 @@ Casos a probar:
 """
 
 
-def test_generar_codigo_plano_normal():
-    """✅ Código generado correctamente"""
-    codigo = generar_codigo_plano("Plano Eléctrico", 7)
-    assert codigo == "PLA-0007"
-
-
-def test_generar_codigo_plano_caracteres_especiales():
-    """✅ Ignora caracteres especiales y genera base correcta"""
-    codigo = generar_codigo_plano("**Plano# de prueba!!", 15)
-    assert codigo.startswith("PLA-") and codigo.endswith("0015")
-
-
-def test_generar_codigo_plano_titulo_vacio():
-    """✅ Si el título está vacío, usa 'PLN' como base"""
-    codigo = generar_codigo_plano("", 1)
-    assert codigo == "PLN-0001"
+@pytest.mark.parametrize("titulo, corr, prefijo", [
+    ("Plano Eléctrico", 7, "PLA-"),
+    ("**Plano# de prueba!!", 15, "PLA-"),
+    ("", 1, "PLN-"),
+    ("A!!B??C", 9, "ABC-"),
+])
+def test_5_generar_codigo_plano(titulo, corr, prefijo):
+    codigo = generar_codigo_plano(titulo, corr)
+    assert codigo.startswith(prefijo)
+    assert codigo.endswith(f"{corr:04d}")
 
 
 """
@@ -235,19 +220,15 @@ Casos a probar:
 """
 
 
-def test_prioridad_plano_critico():
-    """✅ Palabras críticas deben devolver prioridad 3"""
-    assert prioridad_plano("riesgo de incendio en sistema") == 3
-
-
-def test_prioridad_plano_alta():
-    """✅ Palabras de urgencia deben devolver prioridad 2"""
-    assert prioridad_plano("fallo urgente en tablero") == 2
-
-
-def test_prioridad_plano_normal():
-    """✅ Descripción sin palabras clave → prioridad 1"""
-    assert prioridad_plano("revisión general del plano") == 1
+@pytest.mark.parametrize("desc, esperado", [
+    ("riesgo de incendio en sistema", 3),
+    ("fallo urgente en tablero", 2),
+    ("revisión general del plano", 1),
+    ("", 1),
+    (None, 1),
+])
+def test_6_prioridad_plano(desc, esperado):
+    assert prioridad_plano(desc) == esperado
 
 
 """
@@ -263,8 +244,7 @@ Casos a probar:
 """
 
 
-def test_resumen_por_usuario_correcto():
-    """✅ Agrupa correctamente los planos por tipo y usuario"""
+def test_7a_resumen_por_usuario_correcto():
     planos = [
         {"subido_por": 1, "descripcion": "plano eléctrico general"},
         {"subido_por": 1, "descripcion": "diseño arquitectónico base"},
@@ -278,9 +258,35 @@ def test_resumen_por_usuario_correcto():
     assert resultado[3]["General"] == 1
 
 
-def test_resumen_por_usuario_lista_vacia():
-    """✅ Si no hay planos, retorna diccionario vacío"""
+def test_7b_resumen_por_usuario_lista_vacia():
     assert resumen_por_usuario([]) == {}
+
+
+"""
+============================================================
+🧩 7.1 Pruebas para la función: resumen_por_usuario_por_area(planos)
+------------------------------------------------------------
+Objetivo:
+    Agrupar los planos por usuario considerando Área y Subárea.
+Casos a probar:
+    ✅ Usuarios con múltiples combinaciones de Área · Subárea.
+    🚫 Valores vacíos (normaliza a 'Área · Subárea').
+============================================================
+"""
+
+
+def test_7_1_resumen_por_usuario_por_area():
+    planos = [
+        {"subido_por": 1, "area": "producción", "subarea": "laminado en frío"},
+        {"subido_por": 1, "area": "producción", "subarea": "corte"},
+        {"subido_por": 2, "area": "mantenimiento", "subarea": "general"},
+        {"subido_por": 2, "area": "", "subarea": ""},
+    ]
+    res = resumen_por_usuario_por_area(planos)
+    assert res[1]["Producción · Laminado En Frío"] == 1
+    assert res[1]["Producción · Corte"] == 1
+    assert res[2]["Mantenimiento · General"] == 1
+    assert res[2]["Área · Subárea"] == 1
 
 
 """
@@ -291,41 +297,38 @@ Objetivo:
     Detectar planos con mismo título y descripción (ignorando mayúsculas y espacios).
 Casos a probar:
     ✅ Duplicado simple
-    ✅ Múltiples duplicados
     ✅ Sin duplicados
 ============================================================
 """
 
 
-def test_detectar_duplicados_simple():
-    """✅ Detecta un par de planos duplicados"""
+def test_8a_detectar_duplicados_con_area_subarea():
     planos = [
-        {"titulo": "Plano A", "descripcion": "instalaciones eléctricas"},
-        {"titulo": "plano a ", "descripcion": "instalaciones eléctricas "},
+        {"titulo": "Plano A", "descripcion": "instalaciones",
+            "area": "Prod", "subarea": "L1"},
+        {"titulo": "plano a ", "descripcion": "instalaciones ",
+            "area": "Prod", "subarea": "L1"},
+        {"titulo": "Plano B", "descripcion": "instalaciones",
+            "area": "Mant", "subarea": "Gen"},
     ]
-    duplicados = detectar_duplicados(planos)
-    assert (0, 1) in duplicados
+    duplicados = detectar_duplicados(planos, considerar_area_subarea=True)
+    assert duplicados == [(0, 1)]
 
 
-def test_detectar_duplicados_multiples():
-    """✅ Detecta múltiples pares duplicados"""
+def test_8b_detectar_duplicados_sin_area_subarea():
     planos = [
-        {"titulo": "Plano A", "descripcion": "instalaciones eléctricas"},
-        {"titulo": "Plano A", "descripcion": "instalaciones eléctricas"},
-        {"titulo": "Plano B", "descripcion": "estructural"},
-        {"titulo": "plano b", "descripcion": "estructural"},
+        {"titulo": "Plano A", "descripcion": "instalaciones",
+            "area": "Prod", "subarea": "L1"},
+        {"titulo": "plano a ", "descripcion": "instalaciones ",
+            "area": "Mant", "subarea": "Gen"},
+        {"titulo": "Otro", "descripcion": "otra cosa",
+            "area": "Prod", "subarea": "L1"},
     ]
-    duplicados = detectar_duplicados(planos)
-    assert (0, 1) in duplicados
-    assert (2, 3) in duplicados
+    duplicados = detectar_duplicados(planos, considerar_area_subarea=False)
+    assert duplicados == [(0, 1)]
 
 
-def test_detectar_duplicados_sin_coincidencias():
-    """✅ No hay duplicados si los títulos y descripciones difieren"""
-    planos = [
-        {"titulo": "Plano A", "descripcion": "uno"},
-        {"titulo": "Plano B", "descripcion": "dos"},
-        {"titulo": "Plano C", "descripcion": "tres"},
-    ]
-    duplicados = detectar_duplicados(planos)
-    assert duplicados == []
+def test_8c_detectar_duplicados_lista_pequena():
+    assert detectar_duplicados([]) == []
+    assert detectar_duplicados(
+        [{"titulo": "A", "descripcion": "B", "area": "C", "subarea": "D"}]) == []

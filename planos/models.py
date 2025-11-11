@@ -14,8 +14,8 @@ class Plano(models.Model):
     descripcion = models.TextField()
     fecha_subida = models.DateTimeField(auto_now_add=True)
     subido_por = models.ForeignKey(User, on_delete=models.CASCADE)
-    area = models.CharField(max_length=100, null=True, blank=True)
-    subarea = models.CharField(max_length=100, null=True, blank=True)
+    area = models.CharField(max_length=100)
+    subarea = models.CharField(max_length=100)
 
     def __str__(self):
         return self.titulo
