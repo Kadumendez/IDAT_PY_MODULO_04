@@ -34,3 +34,5 @@ cleanup_planos.py
 
 planos/cov_planos/
 newman/
+
+htmlcov/ 
