@@ -1,0 +1,401 @@
+{
+	"info": {
+		"_postman_id": "c4865d6e-8400-4203-82f7-dac354616f5e",
+		"name": "Planos API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "49243007",
+		"_collection_link": "https://kadumendez-9661578.postman.co/workspace/Kad%C3%BA-Desposorio's-Workspace~82be6611-f290-43c5-8f2b-42a54c44846e/collection/49243007-c4865d6e-8400-4203-82f7-dac354616f5e?action=share&source=collection_link&creator=49243007"
+	},
+	"item": [
+		{
+			"name": "POST Crear",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"201 Created\", function () {\r",
+							"  pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"let jsonPOST = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Estructura mínima OK\", function () {\r",
+							"  pm.expect(jsonPOST).to.have.property(\"id\");\r",
+							"  pm.expect(jsonPOST).to.have.property(\"titulo\");\r",
+							"  pm.expect(jsonPOST).to.have.property(\"area\");\r",
+							"  pm.expect(jsonPOST).to.have.property(\"subarea\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Tipos correctos\", function () {\r",
+							"  pm.expect(jsonPOST.id).to.be.a(\"number\");\r",
+							"  pm.expect(jsonPOST.titulo).to.be.a(\"string\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Tiempo < 1s\", function () {\r",
+							"  pm.expect(pm.response.responseTime).to.be.below(1000);\r",
+							"});\r",
+							"\r",
+							"// Guardar ID para siguientes requests\r",
+							"pm.collectionVariables.set(\"plano_id\", jsonPOST.id);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"titulo\": \"Plano de prueba\",\r\n  \"descripcion\": \"Creado desde Postman\",\r\n  \"subido_por\": 1,\r\n  \"area\": \"Producción\",\r\n  \"subarea\": \"Laminado\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{xxx}}/api/planos/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Listar",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200 OK\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"let arrGET = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Devuelve arreglo\", function () {\r",
+							"  pm.expect(arrGET).to.be.an(\"array\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Hay al menos 1 elemento\", function () {\r",
+							"  pm.expect(arrGET.length).to.be.at.least(1);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Cada item tiene campos clave\", function () {\r",
+							"  if (arrGET.length) {\r",
+							"    const p = arrGET[0];\r",
+							"    pm.expect(p).to.have.property(\"id\");\r",
+							"    pm.expect(p).to.have.property(\"titulo\");\r",
+							"  }\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{xxx}}/api/planos/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Detalle",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200 OK\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"const itemGET = pm.response.json();\r",
+							"const idEsperado = parseInt(pm.collectionVariables.get(\"plano_id\"));\r",
+							"\r",
+							"pm.test(\"El id coincide con el creado\", function () {\r",
+							"  pm.expect(itemGET.id).to.eql(idEsperado);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{xxx}}/api/planos/{{plano_id}}/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						"{{plano_id}}",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PUT Actualizar",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200 OK\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"let putJSON = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Cambios aplicados\", function () {\r",
+							"  pm.expect(putJSON.titulo).to.include(\"ACTUALIZADO\");\r",
+							"  pm.expect(putJSON.area).to.eql(\"Arquitectura\"); // ajusta según tu body\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"titulo\": \"Plano ACTUALIZADO {{uniq}}\",\r\n  \"descripcion\": \"Versión revisada\",\r\n  \"subido_por\": 1,\r\n  \"area\": \"Arquitectura\",\r\n  \"subarea\": \"Oficinas\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{xxx}}/api/planos/{{plano_id}}/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						"{{plano_id}}",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PATCH Actualizar",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200 OK\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Subárea actualizada\", function () {\r",
+							"  pm.expect(pm.response.json().subarea).to.eql(\"Corte\"); // ajusta al valor que parches\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"subarea\": \"Corte\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{xxx}}/api/planos/{{plano_id}}/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						"{{plano_id}}",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DELETE Uno",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200/204 OK\", function () {\r",
+							"  pm.expect([200, 204]).to.include(pm.response.code);\r",
+							"});\r",
+							"\r",
+							"// Limpia el ID (por si luego quieres crear otro y evitar confusiones)\r",
+							"pm.collectionVariables.unset(\"plano_id\");\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"subarea\": \"Corte\"\r\n}\r\n"
+				},
+				"url": {
+					"raw": "{{xxx}}/api/planos/{{plano_id}}/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						"{{plano_id}}",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DELETE eliminar_todos",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"200/204 OK (eliminación masiva)\", () => {\r",
+							"  pm.expect([200, 204]).to.include(pm.response.code);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"subarea\": \"Corte\"\r\n}\r\n"
+				},
+				"url": {
+					"raw": "{{xxx}}/api/planos/eliminar_todos/",
+					"host": [
+						"{{xxx}}"
+					],
+					"path": [
+						"api",
+						"planos",
+						"eliminar_todos",
+						""
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "NNK2025IDAT",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "NNK",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "xxx",
+			"value": "http://127.0.0.1:8000"
+		}
+	]
+}

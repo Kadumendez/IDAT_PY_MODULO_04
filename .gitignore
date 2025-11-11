@@ -31,3 +31,6 @@ codigos.md
 
 .coverage
 cleanup_planos.py
+
+planos/cov_planos/
+newman/
