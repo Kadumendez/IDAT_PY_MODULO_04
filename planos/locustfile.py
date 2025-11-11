@@ -1,1 +1,0 @@
-# Esta será el documento con el que se registrarán las pruebas de rendimiento de las apis con locust
