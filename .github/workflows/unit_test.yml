@@ -19,7 +19,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 1) Tu requirements está en UTF-16, lo pasamos a UTF-8
       - name: Convertir requirements a UTF-8
         run: |
           python - << 'PY'
@@ -29,7 +28,6 @@ jobs:
           p.write_text(data, encoding="utf-8")
           PY
 
-      # 2) Quitamos paquetes no compatibles con Ubuntu (ej. pywin32)
       - name: Limpiar paquetes no compatibles
         run: |
           python - << 'PY'
@@ -39,14 +37,13 @@ jobs:
           Path("requirements.txt").write_text("\n".join(filtrado), encoding="utf-8")
           PY
 
-      # 3) Instalamos dependencias + pytest + pytest-django + pytest-cov
       - name: Instalar dependencias del proyecto
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-django pytest-cov
 
-      # 4) Arreglamos ALLOWED_HOSTS para que Django no bloquee
+
       - name: Permitir hosts para CI
         run: |
           python - << 'PY'
@@ -58,25 +55,24 @@ jobs:
             path.write_text(text, encoding="utf-8")
           PY
 
-      # 5) Migraciones
+
       - name: Aplicar migraciones
         run: |
           python manage.py migrate
 
-      # 6) Opcional: sembrar admin si tus tests lo necesitan
+
       - name: Sembrar datos (admin)
         run: |
           python manage.py seed_admin
 
-      # 7) Ejecutar pytest con cobertura
-      # igual que tu profe: pytest planos/tests -v --cov=planos --cov-report=html:planos/cov_planos
+
       - name: Ejecutar pytest con cobertura HTML
         env:
           DJANGO_SETTINGS_MODULE: backend_roles.settings
         run: |
           pytest planos/tests -v --cov=planos --cov-report=html:planos/cov_planos
 
-      # 8) Subir carpeta de cobertura como artefacto
+
       - name: Subir reporte de cobertura
         uses: actions/upload-artifact@v4
         with:
