@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Tu requirements viene en UTF-16, lo pasamos a UTF-8
+      # 1) Tu requirements está en UTF-16, lo pasamos a UTF-8
       - name: Convertir requirements a UTF-8
         run: |
           python - << 'PY'
@@ -29,7 +29,7 @@ jobs:
           p.write_text(data, encoding="utf-8")
           PY
 
-      # Quitamos paquetes que no funcionan en Ubuntu del runner (ej. pywin32)
+      # 2) Quitamos paquetes no compatibles con Ubuntu (ej. pywin32)
       - name: Limpiar paquetes no compatibles
         run: |
           python - << 'PY'
@@ -39,14 +39,14 @@ jobs:
           Path("requirements.txt").write_text("\n".join(filtrado), encoding="utf-8")
           PY
 
+      # 3) Instalamos dependencias + pytest + pytest-html
       - name: Instalar dependencias del proyecto
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # por si tu requirements no trae pytest lo instalamos acá
-          pip install pytest pytest-django
+          pip install pytest pytest-django pytest-html
 
-      # Ajustamos ALLOWED_HOSTS para que no reviente Django en CI
+      # 4) Arreglamos ALLOWED_HOSTS para que Django no bloquee
       - name: Permitir hosts para CI
         run: |
           python - << 'PY'
@@ -58,17 +58,26 @@ jobs:
             path.write_text(text, encoding="utf-8")
           PY
 
+      # 5) Migraciones
       - name: Aplicar migraciones
         run: |
           python manage.py migrate
 
-      # opcional: si tus tests usan el admin que creaste
+      # 6) Opcional: sembrar admin si tus tests lo necesitan
       - name: Sembrar datos (admin)
         run: |
           python manage.py seed_admin
 
-      - name: Ejecutar pytest
+      # 7) Ejecutar pytest y generar HTML
+      - name: Ejecutar pytest (con reporte HTML)
         env:
           DJANGO_SETTINGS_MODULE: backend_roles.settings
         run: |
-          pytest -v
+          pytest -v --html=pytest-report.html --self-contained-html
+
+      # 8) Subir el HTML como artefacto para verlo desde GitHub
+      - name: Subir reporte pytest
+        uses: actions/upload-artifact@v4
+        with:
+            name: pytest-report
+            path: pytest-report.html
