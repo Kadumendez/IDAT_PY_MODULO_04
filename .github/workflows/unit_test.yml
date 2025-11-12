@@ -1,4 +1,4 @@
-name: Pruebas con Pytest
+name: Pruebas con Pytest (con cobertura)
 
 on:
   push:
@@ -39,12 +39,12 @@ jobs:
           Path("requirements.txt").write_text("\n".join(filtrado), encoding="utf-8")
           PY
 
-      # 3) Instalamos dependencias + pytest + pytest-html
+      # 3) Instalamos dependencias + pytest + pytest-django + pytest-cov
       - name: Instalar dependencias del proyecto
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-django pytest-html
+          pip install pytest pytest-django pytest-cov
 
       # 4) Arreglamos ALLOWED_HOSTS para que Django no bloquee
       - name: Permitir hosts para CI
@@ -68,16 +68,17 @@ jobs:
         run: |
           python manage.py seed_admin
 
-      # 7) Ejecutar pytest y generar HTML
-      - name: Ejecutar pytest (con reporte HTML)
+      # 7) Ejecutar pytest con cobertura
+      # igual que tu profe: pytest planos/tests -v --cov=planos --cov-report=html:planos/cov_planos
+      - name: Ejecutar pytest con cobertura HTML
         env:
           DJANGO_SETTINGS_MODULE: backend_roles.settings
         run: |
-          pytest -v --html=pytest-report.html --self-contained-html
+          pytest planos/tests -v --cov=planos --cov-report=html:planos/cov_planos
 
-      # 8) Subir el HTML como artefacto para verlo desde GitHub
-      - name: Subir reporte pytest
+      # 8) Subir carpeta de cobertura como artefacto
+      - name: Subir reporte de cobertura
         uses: actions/upload-artifact@v4
         with:
-            name: pytest-report
-            path: pytest-report.html
+          name: cobertura-pytest
+          path: planos/cov_planos
